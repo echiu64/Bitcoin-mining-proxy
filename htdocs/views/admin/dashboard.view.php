@@ -59,6 +59,7 @@ class AdminDashboardView
     protected function renderBody()
     {
         global $BTC_PROXY;
+        global $BALANCE_JSON;
 ?>
 
 <div id="dashboard">
@@ -153,6 +154,12 @@ class AdminDashboardView
             }
         ?></td>
         <td><?php
+            if (isset($row['rejected_last_interval'])) {
+                echo_html($row['rejected_last_interval']);
+            } else {
+                echo "0";
+            }
+            echo " (";
             if (isset($row['shares_last_interval']) and isset($row['rejected_last_interval'])) {
                 if ($row['shares_last_interval'] > 0) {
                     echo_html(number_format(($row['rejected_last_interval'] / $row['shares_last_interval']) * 100, 2).'%');
@@ -162,6 +169,7 @@ class AdminDashboardView
             } else {
                 echo "0.00%";
             }
+            echo ")";
         ?></td>
         <td><?php
             if (isset($row['mhash'])) {
@@ -171,7 +179,49 @@ class AdminDashboardView
             }
         ?> MHash/s</td>
     </tr>
-    <?php } ?>
+    <?php
+        //build cumulative counts so we don't have to reload the data
+        $global_worker_status['shares_last_interval'] = $global_worker_status['shares_last_interval']+$row['shares_last_interval'];
+        $global_worker_status['rejected_last_interval'] = $global_worker_status['rejected_last_interval']+$row['rejected_last_interval'];
+        $global_worker_status['mhash'] = $global_worker_status['mhash']+$row['mhash'];
+    } ?> 
+    <tr class="datatotals">
+        <td><b>Totals</b></td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td><?php
+            if (isset($global_worker_status['shares_last_interval'])) {
+                echo_html($global_worker_status['shares_last_interval']);
+            } else {
+                echo "0";
+            }
+        ?></td>
+        <td><?php
+            if (isset($global_worker_status['rejected_last_interval'])) {
+                echo_html($global_worker_status['rejected_last_interval']);
+            } else {
+                echo "0";
+            }
+            echo " (";
+            if (isset($global_worker_status['shares_last_interval']) and isset($global_worker_status['rejected_last_interval'])) {
+                if ($global_worker_status['shares_last_interval'] > 0) {
+                    echo_html(number_format(($global_worker_status['rejected_last_interval'] / $global_worker_status['shares_last_interval']) * 100, 2).'%');
+                } else {
+                    echo "0.00%";
+                }
+            } else {
+                echo "0.00%";
+            }
+            echo ")";
+        ?></td>
+        <td><?php
+            if (isset($global_worker_status['mhash'])) {
+                print(round($global_worker_status['mhash'],3));
+            } else {
+                echo "0";
+            }
+        ?> MHash/s</td>
+    </tr>
 </table>
 <div id="workerstatus-chart" align="center"></div>
 </div>
@@ -235,6 +285,12 @@ class AdminDashboardView
             }
         ?></td>
         <td><?php
+            if (isset($row['rejected'])) {
+                echo_html($row['rejected']);
+            } else {
+                echo "0";
+            }
+            echo " (";
             if (isset($row['total']) and isset($row['rejected'])) {
                 if ($row['total'] > 0) {
                     echo_html(number_format(($row['rejected'] / $row['total']) * 100, 2).'%');
@@ -244,27 +300,77 @@ class AdminDashboardView
             } else {
                 echo "0.00%";
             }
+            echo ")";
         ?></td>
     </tr>
-    <?php } ?>
+    <?php
+        //build cumulative counts so we don't have to reload the data
+        $global_pool_status['getworks'] = $global_pool_status['getworks']+$row['getworks'];
+        $global_pool_status['total'] = $global_pool_status['total']+$row['total'];
+        $global_pool_status['rejected'] = $global_pool_status['rejected']+$row['rejected'];
+    } ?>
+    <tr class="datatotals">
+        <td><b>Totals</b></td>
+        <td>&nbsp;</td>
+        <td><?php
+            if (isset($global_pool_status['getworks'])) {
+                echo_html($global_pool_status['getworks']);
+            } else {
+                echo "0";
+            }
+        ?></td>
+        <td><?php
+            if (isset($global_pool_status['total'])) {
+                echo_html($global_pool_status['total']);
+            } else {
+                echo "0";
+            }
+        ?></td>
+        <td><?php
+            if (isset($global_pool_status['rejected'])) {
+                echo_html($global_pool_status['rejected']);
+            } else {
+                echo "0";
+            }
+            echo " (";
+            if (isset($global_pool_status['total']) and isset($global_pool_status['rejected'])) {
+                if ($global_pool_status['total'] > 0) {
+                    echo_html(number_format(($global_pool_status['rejected'] / $global_pool_status['total']) * 100, 2).'%');
+                } else {
+                    echo "0.00%";
+                }
+            } else {
+                echo "0.00%";
+            }
+            echo ")";
+        ?></td>
+    </tr>
 </table>
-<div id="poolchart_div" class="data" align="center">
-</div>
 </div>
 
-<div id="interval_config">
-    <h2>Interval Override</h2>
-    <form action="" method="GET">
-        Interval(seconds):<input type="text" name="interval" size="4"/>
-    </form>
+<br/>
+<div class="poolcharts" align="center">
+<table>
+<tr style="border: 0;">
+   <td><div id="poolchart_div"></div></td>
+   <td><div id="poolchart_balance_col"></div><div id="balance_col_footer" align="center"></div></td>
+</tr>
+</table>
 </div>
 
+<div id="interval_override">
+<h2>Interval Override</h2>
+<form action="" method="GET">
+Interval(seconds):<input type="text" name="interval" size="4"/>
+</form>
 </div>
+
 <?php
 if ($BTC_PROXY['enable_graphs']) { ?>
 
 <script type="text/javascript">
     google.load("visualization", "1", {packages:["corechart"]});
+    google.load("jquery", "1.6.2");
     google.setOnLoadCallback(drawChartPool);
     google.setOnLoadCallback(drawChartWorkerShares);
     function drawChartPool() {
@@ -284,7 +390,7 @@ if ($BTC_PROXY['enable_graphs']) { ?>
 
       var chart = new google.visualization.PieChart(document.getElementById('poolchart_div'));
       chart.draw(data, {backgroundColor: '#222', 
-		width: 380, height: 200,
+		width: 440, height: 260, legend: 'left',
 		titleTextStyle: {color: 'white'},
 		pieSliceTextStyle: {color: 'white'},
 		legendTextStyle: {color: 'white'},
@@ -310,15 +416,135 @@ if ($BTC_PROXY['enable_graphs']) { ?>
       ?>
       var chart = new google.visualization.PieChart(document.getElementById('workerstatus-chart'));
       chart.draw(data, {backgroundColor: '#222', 
-                width: 380, height: 200,
+                width: 500, height: 220,
                 titleTextStyle: {color: 'white'},
                 pieSliceTextStyle: {color: 'white'},
                 legendTextStyle: {color: 'white'},
                 title: 'Worker Shares Distribution'});
     }
 </script>
+
 <?php
 } ?>
+
+<!-- Balance stats -->
+<script type="text/javascript">
+
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
+
+var balance = new Array();
+var unconfirmed = new Array();
+var pool_count = <?php echo count($BALANCE_JSON) ?>;
+var pools = [<?php
+   $i = 0;
+   foreach ($BALANCE_JSON as $key => $value) {
+	echo "'$key'";
+        $i++;
+	if ($i < count($BALANCE_JSON)) { echo ","; }
+   }
+?>];
+<?php
+foreach ($BALANCE_JSON as $key => $value) {
+   echo "pools['$key'] = new Array();\n";
+   echo "pools['$key']['confirmed'] = '" . $BALANCE_JSON[$key]['confirmed'] ."';\n";
+   echo "pools['$key']['unconfirmed'] = '" . $BALANCE_JSON[$key]['unconfirmed'] ."';\n";
+}
+?>
+
+function createGraphNotifier() {
+   var counter = <?php echo count($BALANCE_JSON) ?>;
+   return function() {
+      if (--counter == 0) graphBalances();
+   }
+}
+var notifyGraph = createGraphNotifier();
+
+function getBalance(id, balance) {
+   $.ajaxSetup({timeout: 15000});
+   $.getJSON('../proxy-json.php?pool='+id, function(data) {
+      // confirmed
+      var evalstr = "var t = data." + pools[id]['confirmed'];
+      eval(evalstr);
+      balance[id] = t;
+      // unconfirmed
+      if (pools[id]['unconfirmed']) {
+         t = 0;
+         evalstr = "t = data." + pools[id]['unconfirmed'];
+         eval(evalstr);
+         unconfirmed[id] = t;
+      }
+      console.log(id+ ": " + balance[id] + " / " + unconfirmed[id]);
+      notifyGraph();
+   });
+}
+
+function getBalances(balance) {   
+   var counter = 0;
+   for (var pool in pools) {
+      if (pools[pool]['confirmed'])
+         getBalance(pool, balance);
+   }
+}
+
+
+<?php if ($BTC_PROXY['enable_graphs']) { ?>
+function graphBalances() {
+   console.log("graphBalances() " + Object.size(balance));
+   function drawBalanceGraphCol() {
+      if (!(balance && Object.size(balance) > 0)) { console.log("return"); return; }
+      var balance_total = 0;
+      var unconfirmed_total = 0;
+      for (var bal in balance) {
+         balance_total += parseFloat(balance[bal]);
+         if (unconfirmed[bal])
+                unconfirmed_total += parseFloat(unconfirmed[bal]);
+      }
+      balance_total = Math.round(balance_total*1000)/1000;
+      unconfirmed_total = Math.round(unconfirmed_total*1000)/1000;
+      var total = balance_total + unconfirmed_total;
+      total = Math.round(total*1000)/1000;
+      document.getElementById('balance_col_footer')
+	.innerHTML = '<strong>Total:</strong> ' + total;
+      var data = new google.visualization.DataTable();
+      data.addColumn('string', 'Pool');
+      data.addColumn('number', 'Confirmed ('+balance_total+')');
+      data.addColumn('number', 'Unconfirmed ('+unconfirmed_total+')');
+
+      data.addRows(pool_count);
+      var i = 0;
+      for (var bal in balance) {
+         data.setValue(i, 0, bal);
+         data.setValue(i, 1, parseFloat(balance[bal]));
+         data.setValue(i, 2, parseFloat(unconfirmed[bal]));
+         i++;
+      }
+      var chart = new google.visualization.ColumnChart(document.getElementById('poolchart_balance_col'));
+      chart.draw(data, {width:500, height:260, 
+			backgroundColor: '#222',
+			titleTextStyle: {color: 'white'},
+                	pieSliceTextStyle: {color: 'white'},
+                	legendTextStyle: {color: 'white'},
+			title: 'Mining Pool Balance(s)',
+			isStacked: true, legend: 'bottom',
+			hAxis: { title:' ', titleTextStyle: {color: 'white'}, textStyle: {color: 'white'} },
+			vAxis: { title:'BTC', titleTextStyle: {color: 'white'}, textStyle: {color: 'white'} }
+			});
+   }
+   drawBalanceGraphCol();
+}
+window.addEventListener("balanceReady", graphBalances, false);
+<?php } ?>
+
+setTimeout(getBalances(balance), 3000);
+
+</script>
+
 
 <?php
     }
